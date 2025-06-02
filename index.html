@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Drob Infection - Login</title>
+  <style>
+    body {
+      background: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 2rem;
+    }
+    #game-frame {
+      width: 90vw;
+      height: 480px;
+      border: 2px solid #ccc;
+      margin-top: 1rem;
+    }
+    .hidden { display: none; }
+    input, button {
+      padding: 0.5rem;
+      margin: 0.3rem;
+    }
+    #admin-panel {
+      margin-top: 2rem;
+      border-top: 1px solid #999;
+      padding-top: 1rem;
+    }
+    table {
+      margin: 0 auto;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 0.5rem 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Drob Infection</h1>
+
+  <div id="login-register">
+    <h2>Login</h2>
+    <input id="login-username" placeholder="Username" />
+    <input id="login-password" type="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+
+    <h3>Or Create Account</h3>
+    <input id="register-username" placeholder="Username" />
+    <input id="register-password" type="password" placeholder="Password" />
+    <button onclick="register()">Create Account</button>
+
+    <p id="message" style="color:red;"></p>
+  </div>
+
+  <div id="game-section" class="hidden">
+    <p>Logged in as <span id="current-user"></span> <button onclick="logout()">Logout</button></p>
+    <iframe src="game/index.html" id="game-frame"></iframe>
+    <br />
+    <button onclick="saveHighscore()">Save Highscore</button>
+    <button onclick="loadHighscore()">Load Highscore</button>
+    <p>Highscore: <span id="highscore-display">0</span></p>
+  </div>
+
+  <div id="admin-panel" class="hidden">
+    <h2>Admin Panel (Yifey only)</h2>
+    <table>
+      <thead><tr><th>Username</th><th>Playtime (seconds)</th></tr></thead>
+      <tbody id="user-list"></tbody>
+    </table>
+  </div>
+
+  <script>
+    // Simple localStorage user DB for demo (username -> {password, highscore, playtime})
+    // playtime is dummy here, you could update it by tracking time playing game.
+
+    let currentUser = null;
+    let playStartTime = null;
+
+    function getUsers() {
+      const usersJSON = localStorage.getItem("users");
+      return usersJSON ? JSON.parse(usersJSON) : {};
+    }
+    function setUsers(users) {
+      localStorage.setItem("users", JSON.stringify(users));
+    }
+
+    function login() {
+      const username = document.getElementById("login-username").value.trim();
+      const password = document.getElementById("login-password").value;
+
+      if (!username || !password) {
+        showMessage("Please enter username and password");
+        return;
+      }
+
+      const users = getUsers();
+      if (!users[username]) {
+        showMessage("User not found");
+        return;
+      }
+      if (users[username].password !== password) {
+        showMessage("Wrong password");
+        return;
+      }
+
+      currentUser = username;
+      playStartTime = Date.now();
+      showGameSection();
+      clearMessage();
+    }
+
+    function register() {
+      const username = document.getElementById("register-username").value.trim();
+      const password = document.getElementById("register-password").value;
+
+      if (!username || !password) {
+        showMessage("Please enter username and password");
+        return;
+      }
+      if (username === "Yifey") {
+        showMessage("Cannot create account with reserved username");
+        return;
+      }
+
+      const users = getUsers();
+      if (users[username]) {
+        showMessage("Username already taken");
+        return;
+      }
+
+      users[username] = { password, highscore: 0, playtime: 0 };
+      setUsers(users);
+
+      showMessage("Account created! Please login.");
+    }
+
+    function logout() {
+      savePlaytime();
+      currentUser = null;
+      playStartTime = null;
+      document.getElementById("game-section").classList.add("hidden");
+      document.getElementById("admin-panel").classList.add("hidden");
+      document.getElementById("login-register").classList.remove("hidden");
+    }
+
+    function showGameSection() {
+      document.getElementById("login-register").classList.add("hidden");
+      document.getElementById("game-section").classList.remove("hidden");
+      document.getElementById("current-user").textContent = currentUser;
+
+      // Show admin panel only if user is "Yifey"
+      if (currentUser === "Yifey") {
+        document.getElementById("admin-panel").classList.remove("hidden");
+        refreshAdminPanel();
+      } else {
+        document.getElementById("admin-panel").classList.add("hidden");
+      }
+
+      loadHighscore();
+    }
+
+    function saveHighscore() {
+      const users = getUsers();
+      let highscore = prompt("Enter your new highscore (number):");
+      highscore = Number(highscore);
+      if (isNaN(highscore) || highscore < 0) {
+        alert("Invalid highscore");
+        return;
+      }
+      if (highscore > (users[currentUser].highscore || 0)) {
+        users[currentUser].highscore = highscore;
+        setUsers(users);
+        document.getElementById("highscore-display").textContent = highscore;
+        alert("Highscore saved!");
+      } else {
+        alert("New highscore must be higher than previous");
+      }
+    }
+
+    function loadHighscore() {
+      const users = getUsers();
+      const hs = users[currentUser]?.highscore || 0;
+      document.getElementById("highscore-display").textContent = hs;
+    }
+
+    function showMessage(msg) {
+      document.getElementById("message").textContent = msg;
+    }
+    function clearMessage() {
+      showMessage("");
+    }
+
+    function refreshAdminPanel() {
+      const users = getUsers();
+      const tbody = document.getElementById("user-list");
+      tbody.innerHTML = "";
+      Object.entries(users).forEach(([user, data]) => {
+        const tr = document.createElement("tr");
+        const tdUser = document.createElement("td");
+        tdUser.textContent = user;
+        const tdTime = document.createElement("td");
+        tdTime.textContent = Math.floor(data.playtime / 1000); // seconds
+        tr.appendChild(tdUser);
+        tr.appendChild(tdTime);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function savePlaytime() {
+      if (!currentUser || !playStartTime) return;
+      const users = getUsers();
+      const now = Date.now();
+      const elapsed = now - playStartTime;
+      users[currentUser].playtime = (users[currentUser].playtime || 0) + elapsed;
+      setUsers(users);
+      playStartTime = now;
+    }
+
+    // Save playtime every minute and on unload
+    setInterval(savePlaytime, 60000);
+    window.addEventListener("beforeunload", () => {
+      savePlaytime();
+    });
+  </script>
+
+</body>
+</html>
